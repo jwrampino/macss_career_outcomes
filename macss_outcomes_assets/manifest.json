@@ -1,15 +1,28 @@
 {
+  "preview": {
+    "png": "macss_outcomes_assets\\macss_outcomes_preview.png",
+    "pdf": "macss_outcomes_assets\\macss_outcomes_preview.pdf"
+  },
+  "hero": {
+    "png": "macss_outcomes_assets\\hero.png"
+  },
+  "snapshot_section": {
+    "png": "macss_outcomes_assets\\snapshot_section.png"
+  },
+  "phd_section": {
+    "png": "macss_outcomes_assets\\phd_section.png"
+  },
+  "professional_section": {
+    "png": "macss_outcomes_assets\\professional_section.png"
+  },
   "snapshot_key_metrics": {
-    "png": "macss_outcomes_assets\\snapshot_key_metrics.png",
-    "svg": "macss_outcomes_assets\\snapshot_key_metrics.svg"
+    "png": "macss_outcomes_assets\\snapshot_key_metrics.png"
   },
   "snapshot_big_stat": {
-    "png": "macss_outcomes_assets\\snapshot_big_stat.png",
-    "svg": "macss_outcomes_assets\\snapshot_big_stat.svg"
+    "png": "macss_outcomes_assets\\snapshot_big_stat.png"
   },
   "phd_core_fields": {
-    "png": "macss_outcomes_assets\\phd_core_fields.png",
-    "svg": "macss_outcomes_assets\\phd_core_fields.svg"
+    "png": "macss_outcomes_assets\\phd_core_fields.png"
   },
   "phd_other_disciplines": {
     "png": "macss_outcomes_assets\\phd_other_disciplines.png"
@@ -34,8 +47,5 @@
   },
   "professional_other_sectors": {
     "png": "macss_outcomes_assets\\professional_other_sectors.png"
-  },
-  "preview": {
-    "png": "macss_outcomes_assets\\macss_outcomes_preview.png"
   }
 }
