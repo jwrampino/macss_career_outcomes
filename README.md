@@ -23,12 +23,11 @@
     ├── phd_section.png
     ├── professional_section.png
     ├── macss_outcomes_preview.png
-    ├── macss_outcomes_preview.pdf
-    └── manifest.json
+    └── macss_outcomes_preview.pdf
 ```
 
 ## Notes
 
-- macss_outcomes_example.html → source of truth for layout  
+- macss_outcomes_example.html → website example used to generate visuals
 - macss_outcomes_visuals.py → renders HTML and exports visuals using Playwright  
 - macss_outcomes_assets/ → generated outputs
