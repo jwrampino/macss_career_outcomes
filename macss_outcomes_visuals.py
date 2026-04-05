@@ -1,22 +1,19 @@
 from __future__ import annotations
 
 """
-Per-cell PNG assets (rendered directly from HTML):
-- snapshot_key_metrics
-- snapshot_big_stat
-- phd_core_fields
-- phd_other_disciplines
-- phd_placements
-- professional_applied_research
-- professional_consulting
-- professional_data_science_analytics
-- professional_finance
-- professional_startups_tech
-- professional_other_sectors
+Generalized HTML-to-assets exporter for the MACSS outcomes pages.
 
-As well as:
-- section-level exports
-- full-page preview (PNG + PDF)
+What this version fixes:
+- does NOT rely on rigid nth-of-type selectors
+- finds sections by their actual headings / labels
+- tolerates style-only HTML variants (font, radius, color changes, etc.)
+- can usually survive modest wrapper/layout changes as long as the content labels remain
+
+Outputs:
+- full-page preview PNG + PDF
+- hero PNG
+- section PNGs
+- card PNGs
 
 Dependencies:
 pip install playwright
@@ -24,41 +21,40 @@ python -m playwright install chromium
 """
 
 from pathlib import Path
+from typing import Iterable, Sequence
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page, Locator, sync_playwright
 
 #==========config==========#
 
-HTML_PATH = Path("macss_outcomes_example.html")
-OUTPUT_DIR = Path("macss_outcomes_assets")
+HTML_PATH = Path("macss_outcomes_example_3.html") # swap for desired html path
+OUTPUT_DIR = Path("macss_outcomes_assets_3") # swap for desired output path
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 VIEWPORT_WIDTH = 1600
-VIEWPORT_HEIGHT = 3200
+VIEWPORT_HEIGHT = 3600
 DEVICE_SCALE_FACTOR = 2
 PAGE_BG = "#efe8df"
 
-#==========selectors==========#
-
-CARD_SELECTORS = {
-    "snapshot_key_metrics": "section:nth-of-type(1) .grid-2 > .card:nth-of-type(1)",
-    "snapshot_big_stat": "section:nth-of-type(1) .grid-2 > .card:nth-of-type(2)",
-    "phd_core_fields": "section:nth-of-type(2) .grid-3 > .card:nth-of-type(1)",
-    "phd_other_disciplines": "section:nth-of-type(2) .grid-3 > .card:nth-of-type(2)",
-    "phd_placements": "section:nth-of-type(2) .grid-3 > .card:nth-of-type(3)",
-    "professional_applied_research": "section:nth-of-type(3) .grid-3 > .card:nth-of-type(1)",
-    "professional_consulting": "section:nth-of-type(3) .grid-3 > .card:nth-of-type(2)",
-    "professional_data_science_analytics": "section:nth-of-type(3) .grid-3 > .card:nth-of-type(3)",
-    "professional_finance": "section:nth-of-type(3) .grid-3 > .card:nth-of-type(4)",
-    "professional_startups_tech": "section:nth-of-type(3) .grid-3 > .card:nth-of-type(5)",
-    "professional_other_sectors": "section:nth-of-type(3) .grid-3 > .card:nth-of-type(6)",
+# output stems to semantic identifiers
+SECTION_LABELS = {
+    "snapshot_section": "Class of 2024 Snapshot",
+    "phd_section": "PhD Outcomes by Field",
+    "professional_section": "Professional Outcomes (2018–2023)",
 }
 
-SECTION_SELECTORS = {
-    "hero": "header.hero",
-    "snapshot_section": "section:nth-of-type(1)",
-    "phd_section": "section:nth-of-type(2)",
-    "professional_section": "section:nth-of-type(3)",
+CARD_LABELS = {
+    "snapshot_key_metrics": "Key Metrics",
+    "snapshot_big_stat": "Employment or Doctoral Placement within 9 Months",
+    "phd_core_fields": "Core Fields",
+    "phd_other_disciplines": "Other Disciplines",
+    "phd_placements": "PhD Placements",
+    "professional_applied_research": "Applied Research",
+    "professional_consulting": "Consulting",
+    "professional_data_science_analytics": "Data Science / Analytics",
+    "professional_finance": "Finance",
+    "professional_startups_tech": "Startups / Tech",
+    "professional_other_sectors": "Other Sectors",
 }
 
 #==========html handling==========#
@@ -66,7 +62,7 @@ SECTION_SELECTORS = {
 def _read_html(html_path: Path) -> str:
     if not html_path.exists():
         raise FileNotFoundError(
-            f"Could not find HTML file: {html_path.resolve()}"
+            f"Could not find HTML file: {html_path.resolve()}\n"
             "Put the exported HTML in the same directory as this script, or change HTML_PATH."
         )
     return html_path.read_text(encoding="utf-8")
@@ -109,14 +105,90 @@ def _normalize_html_for_export(html_text: str) -> str:
         return html_text.replace("</head>", inject + "</head>")
     return inject + html_text
 
+#==========locator helpers==========#
+
+def _first_existing(page: Page, selector_candidates: Sequence[str]) -> Locator:
+    for selector in selector_candidates:
+        loc = page.locator(selector)
+        if loc.count() > 0:
+            return loc.first
+    raise ValueError(
+        "None of the selector candidates matched:\n" + "\n".join(f"- {s}" for s in selector_candidates)
+    )
+
+
+def _locator_with_text(page: Page, base_selector: str, text: str) -> Locator:
+    """
+    Robust text-based locator:
+    - exact text in semantic containers first
+    - generic text fallback second
+    """
+    candidates = [
+        f'{base_selector}:has-text("{text}")',
+        f':text("{text}")',
+    ]
+    return _first_existing(page, candidates)
+
+
+def _ancestor_card(locator: Locator) -> Locator:
+    candidates = [
+        "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' card ')][1]",
+        "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' big-stat ')][1]",
+        "xpath=ancestor::div[1]",
+    ]
+    for selector in candidates:
+        loc = locator.locator(selector)
+        if loc.count() > 0:
+            return loc.first
+    return locator
+
+
+def _ancestor_section(locator: Locator) -> Locator:
+    candidates = [
+        "xpath=ancestor::section[1]",
+        "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' section ')][1]",
+    ]
+    for selector in candidates:
+        loc = locator.locator(selector)
+        if loc.count() > 0:
+            return loc.first
+    return locator
+
+
+def _hero_locator(page: Page) -> Locator:
+    return _first_existing(page, ["header.hero", ".hero", "header:has(h1)"])
+
+
+def _find_section_by_heading(page: Page, heading_text: str) -> Locator:
+    heading = _first_existing(page, [
+        f'h2:has-text("{heading_text}")',
+        f'h1:has-text("{heading_text}")',
+        f':text("{heading_text}")',
+    ])
+    return _ancestor_section(heading)
+
+
+def _find_card_by_label(page: Page, label_text: str) -> Locator:
+    # strongest candidates first: headings or labels inside known card-like blocks
+    anchor = _first_existing(page, [
+        f'h3:has-text("{label_text}")',
+        f'h2:has-text("{label_text}")',
+        f'.label:has-text("{label_text}")',
+        f'.bar-meta:has-text("{label_text}")',
+        f'.list .item:has-text("{label_text}")',
+        f'.subtle:has-text("{label_text}")',
+        f':text("{label_text}")',
+    ])
+    return _ancestor_card(anchor)
+
 #==========export helpers==========#
 
-def _screenshot_locator(locator, path: Path) -> None:
+def _screenshot_locator(locator: Locator, path: Path) -> None:
     locator.scroll_into_view_if_needed()
     locator.screenshot(path=str(path), animations="disabled", scale="device")
 
 
-def _pdf_page(page, path: Path) -> None:
+def _pdf_page(page: Page, path: Path) -> None:
     page.pdf(
         path=str(path),
         print_background=True,
@@ -124,16 +196,6 @@ def _pdf_page(page, path: Path) -> None:
         height="2200px",
         margin={"top": "0px", "right": "0px", "bottom": "0px", "left": "0px"},
     )
-
-
-def _export_group(page, selectors: dict[str, str]) -> None:
-    for stem, selector in selectors.items():
-        locator = page.locator(selector).first
-        if locator.count() == 0:
-            raise ValueError(f"Selector did not match anything: {selector}")
-
-        png_path = OUTPUT_DIR / f"{stem}.png"
-        _screenshot_locator(locator, png_path)
 
 #==========export pipeline==========#
 
@@ -159,19 +221,20 @@ def export_assets(html_path: Path = HTML_PATH) -> None:
             animations="disabled",
             scale="device",
         )
-
         _pdf_page(page, OUTPUT_DIR / "macss_outcomes_preview.pdf")
 
-        # section-level exports
-        for stem, selector in SECTION_SELECTORS.items():
-            locator = page.locator(selector).first
-            if locator.count() == 0:
-                raise ValueError(f"Section selector did not match anything: {selector}")
+        # hero export
+        _screenshot_locator(_hero_locator(page), OUTPUT_DIR / "hero.png")
 
-            _screenshot_locator(locator, OUTPUT_DIR / f"{stem}.png")
+        # section-level exports
+        for stem, heading_text in SECTION_LABELS.items():
+            section_loc = _find_section_by_heading(page, heading_text)
+            _screenshot_locator(section_loc, OUTPUT_DIR / f"{stem}.png")
 
         # card-level exports
-        _export_group(page, CARD_SELECTORS)
+        for stem, label_text in CARD_LABELS.items():
+            card_loc = _find_card_by_label(page, label_text)
+            _screenshot_locator(card_loc, OUTPUT_DIR / f"{stem}.png")
 
         browser.close()
 
