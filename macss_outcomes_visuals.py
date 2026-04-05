@@ -27,8 +27,8 @@ from playwright.sync_api import Page, Locator, sync_playwright
 
 #==========config==========#
 
-HTML_PATH = Path("macss_outcomes_example_3.html") # swap for desired html path
-OUTPUT_DIR = Path("macss_outcomes_assets_3") # swap for desired output path
+HTML_PATH = Path("macss_outcomes_example_spectral.html") # swap for desired html path
+OUTPUT_DIR = Path("macss_outcomes_assets_spectral") # swap for desired output path
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 VIEWPORT_WIDTH = 1600
